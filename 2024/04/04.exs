@@ -1,95 +1,79 @@
 # https://adventofcode.com/2024/day/4
 # this is the version what Cursor refactored
 defmodule PatternFinder do
+  @patterns ["XMAS", "SAMX"]
+  @pattern_length 4
+
   def count_patterns(input_file) do
-    grid = parse_input(input_file)
-    dimensions = get_dimensions(grid)
+    grid =
+      File.read!(input_file)
+      |> String.split("\n", trim: true)
+      |> Enum.map(&String.graphemes/1)
 
     [
-      find_horizontal_patterns(grid),
-      find_vertical_patterns(grid, dimensions),
-      find_diagonal_patterns(grid, dimensions)
+      count_in_rows(grid),
+      count_in_columns(grid),
+      count_in_diagonals(grid)
     ]
     |> Enum.sum()
-    |> IO.inspect(label: "Total patterns found")
+    |> IO.inspect(label: "Total")
   end
 
-  defp parse_input(file) do
-    File.read!(file)
-    |> String.split("\n")
-    |> Enum.map(&String.trim/1)
-    |> Enum.filter(&(&1 != ""))
-    |> Enum.map(&String.graphemes/1)
-  end
-
-  defp get_dimensions(grid) do
-    %{
-      height: length(grid),
-      width: length(Enum.at(grid, 0))
-    }
-  end
-
-  defp find_horizontal_patterns(grid) do
-    patterns = ~w(XMAS SAMX)
-
+  defp count_in_rows(grid) do
     grid
     |> Enum.map(&Enum.join/1)
-    |> Enum.map(fn line ->
-      patterns
-      |> Enum.map(fn pattern ->
-        Regex.scan(~r/#{pattern}/, line) |> length()
-      end)
-      |> Enum.sum()
-    end)
-    |> Enum.sum()
-    |> IO.inspect(label: "Horizontal patterns")
+    |> count_patterns_in_strings()
+    |> IO.inspect(label: "Horizontal")
   end
 
-  defp find_vertical_patterns(grid, %{height: height, width: width}) do
-    patterns = ["XMAS", "SAMX"]
-
-    for col <- 0..(width - 1),
-        row <- 0..(height - 4) do
-      0..3
-      |> Enum.map(fn i -> Enum.at(grid, row + i) |> Enum.at(col) end)
-      |> Enum.join()
-    end
-    |> Enum.count(fn pattern -> pattern in patterns end)
-    |> IO.inspect(label: "Vertical patterns")
+  defp count_in_columns(grid) do
+    grid
+    |> List.zip()
+    |> Enum.map(&Tuple.to_list/1)
+    |> Enum.map(&Enum.join/1)
+    |> count_patterns_in_strings()
+    |> IO.inspect(label: "Vertical")
   end
 
-  defp find_diagonal_patterns(grid, %{height: height, width: width}) do
-    patterns = ["XMAS", "SAMX"]
+  defp count_in_diagonals(grid) do
+    height = length(grid)
+    width = length(hd(grid))
 
-    for row <- 0..(height - 4),
-        col <- 0..(width - 4) do
-      # Left to right diagonal
-      lr_diagonal = get_diagonal(grid, row, col, :lr)
-      # Right to left diagonal
-      rl_diagonal = get_diagonal(grid, row, col + 3, :rl)
+    # Get all possible diagonals (both directions)
+    diagonals =
+      for row <- 0..(height - @pattern_length),
+          col <- 0..(width - @pattern_length) do
+        [
+          # left-to-right
+          get_diagonal(grid, row, col, 1),
+          # right-to-left
+          get_diagonal(grid, row, col + 3, -1)
+        ]
+      end
+      |> List.flatten()
 
-      Enum.count([lr_diagonal, rl_diagonal], fn pattern -> pattern in patterns end)
-    end
-    |> Enum.sum()
-    |> IO.inspect(label: "Diagonal patterns")
+    count_patterns_in_strings(diagonals)
+    |> IO.inspect(label: "Diagonal")
   end
 
-  defp get_diagonal(grid, row, col, direction) do
+  defp get_diagonal(grid, row, col, step) do
     0..3
     |> Enum.map(fn i ->
-      col_index =
-        case direction do
-          :lr -> col + i
-          :rl -> col - i
-        end
-
-      grid
-      |> Enum.at(row + i)
-      |> Enum.at(col_index)
+      grid |> Enum.at(row + i) |> Enum.at(col + i * step)
     end)
     |> Enum.join()
   end
+
+  defp count_patterns_in_strings(strings) do
+    strings
+    |> Enum.flat_map(fn str ->
+      @patterns
+      |> Enum.map(fn pattern ->
+        str |> String.split(pattern) |> length() |> Kernel.-(1)
+      end)
+    end)
+    |> Enum.sum()
+  end
 end
 
-# Run the pattern finder
 PatternFinder.count_patterns("input.txt")
